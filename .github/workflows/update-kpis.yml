@@ -1,14 +1,14 @@
-name: Update COMEX Dashboard KPIs
+name: Update KPIs
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Tous les jours à 6h00 UTC (7h00 Paris)
-  workflow_dispatch:      # Permet de lancer manuellement
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
   update-kpis:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,87 +27,68 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Fetch KPIs from SharePoint
-        id: fetch_kpis
-          run: |
-            TOKEN="${{ steps.get_token.outputs.token }}"
-            echo "Token length: ${#TOKEN}"
-    
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-          "https://bcriholding.sharepoint.com/sites/cockpitdirection/_api/web/lists/getbytitle('KPIs')/items?\$select=Titre,Indicateur,Valeur,Delta,Tendance&\$orderby=Titre%20asc" \
-          -H "Accept: application/json;odata=nometadata" \
-          -H "Authorization: Bearer $TOKEN")
-    
-        echo "Full response: $RESPONSE"
-        HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
-        echo "HTTP Status: $HTTP_STATUS"
-        
-        BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
-        echo "kpis=$BODY" >> $GITHUB_OUTPUT
+        id: fetch-kpis
+        run: |
+          TOKEN="${{ steps.get-token.outputs.token }}"
+          echo "Token length: ${#TOKEN}"
+
+          RESPONSE=$(curl -s \
+            --write-out "\nHTTP_STATUS:%{http_code}" \
+            "https://bcriholding.sharepoint.com/sites/cockpitdirection/_api/web/lists/getbytitle('KPIs')/items?\$select=Titre,Indicateur,Valeur,Delta,Tendance&\$orderby=Titre%20asc" \
+            -H "Accept: application/json;odata=nometadata" \
+            -H "Authorization: Bearer $TOKEN")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response body: $BODY"
+          echo "kpis=$BODY" >> $GITHUB_OUTPUT
 
       - name: Update index.html with new KPIs
         run: |
           python3 << 'EOF'
-          import json
-          import re
-          import os
+          import json, os, re
 
-          # Parse KPIs
-          kpis_raw = os.environ.get('KPIS_DATA', '{}')
+          kpis_raw = os.environ.get("KPIS", "")
+          print(f"Raw KPIs received: {kpis_raw[:200]}")
+
           try:
               data = json.loads(kpis_raw)
-              items = data.get('value', [])
-          except:
-              items = []
+              items = data.get("value", [])
+              print(f"Found {len(items)} KPI items")
+          except Exception as e:
+              print(f"JSON parse error: {e}")
+              print("No KPI data found, keeping existing values")
+              exit(0)
 
           if not items:
               print("No KPI data found, keeping existing values")
               exit(0)
 
-          # Sort by Titre
-          items.sort(key=lambda x: x.get('Titre', '0'))
+          kpi_map = {item["Indicateur"]: item for item in items}
 
-          colors = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
-          kpi_html = ''
-          for i, item in enumerate(items):
-              indicateur = item.get('Indicateur', '')
-              valeur = item.get('Valeur', '')
-              delta = item.get('Delta', '')
-              tendance = (item.get('Tendance') or '').lower()
-              is_up = tendance == 'up'
-              delta_class = 'up' if is_up else 'dn'
-              arrow = '▲' if is_up else '▼'
-              color = colors[i % len(colors)]
-              kpi_html += f'''        <div class="kpi" style="border-top: 2px solid {color}">
-                <div class="kpi-label">{indicateur}</div>
-                <div class="kpi-value">{valeur}</div>
-                <div class="kpi-delta {delta_class}">{arrow} {delta}</div>
-              </div>
-          '''
+          with open("index.html", "r", encoding="utf-8") as f:
+              html = f.read()
 
-          # Read current index.html
-          with open('index.html', 'r', encoding='utf-8') as f:
-              content = f.read()
+          for indicateur, item in kpi_map.items():
+              valeur = item.get("Valeur", "")
+              delta = item.get("Delta", "")
+              tendance = item.get("Tendance", "up").lower()
+              print(f"Updating {indicateur}: {valeur} / {delta} / {tendance}")
 
-          # Replace KPI section between markers
-          pattern = r'(<!-- KPI-START -->).*?(<!-- KPI-END -->)'
-          replacement = f'<!-- KPI-START -->\n{kpi_html.strip()}\n  <!-- KPI-END -->'
-          new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(html)
 
-          if new_content == content:
-              print("Warning: KPI markers not found in index.html")
-          else:
-              with open('index.html', 'w', encoding='utf-8') as f:
-                  f.write(new_content)
-              print(f"Successfully updated {len(items)} KPIs")
-
+          print("index.html updated successfully")
           EOF
         env:
-          KPIS_DATA: ${{ steps.fetch-kpis.outputs.kpis }}
+          KPIS: ${{ steps.fetch-kpis.outputs.kpis }}
 
       - name: Commit and push changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --staged --quiet || git commit -m "🔄 Mise à jour automatique des KPIs - $(date +'%d/%m/%Y %H:%M')"
+          git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
           git push
