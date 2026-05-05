@@ -13,18 +13,65 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get Azure token
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y openssl
+          pip install msal requests
+
+      - name: Get Azure token with certificate
         id: get-token
         run: |
-          TOKEN=$(curl -s -X POST \
-            "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "client_id=${{ secrets.AZURE_CLIENT_ID }}" \
-            -d "client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
-            -d "scope=https://bcriholding.sharepoint.com/.default" \
-            -d "grant_type=client_credentials" \
-            | jq -r '.access_token')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          python3 << 'EOF'
+          import msal, os
+
+          tenant_id = os.environ["AZURE_TENANT_ID"]
+          client_id = os.environ["AZURE_CLIENT_ID"]
+          cert_b64  = os.environ["AZURE_CERT_BASE64"]
+          cert_pwd  = os.environ["AZURE_CERT_PASSWORD"]
+
+          import base64, tempfile
+          pfx_data = base64.b64decode(cert_b64)
+          with tempfile.NamedTemporaryFile(suffix=".pfx", delete=False) as f:
+              f.write(pfx_data)
+              pfx_path = f.name
+
+          # Convertir PFX en PEM
+          import subprocess
+          pem_path = pfx_path.replace(".pfx", ".pem")
+          subprocess.run([
+              "openssl", "pkcs12", "-in", pfx_path,
+              "-out", pem_path, "-nodes",
+              "-passin", f"pass:{cert_pwd}"
+          ], check=True, capture_output=True)
+
+          with open(pem_path) as f:
+              pem = f.read()
+
+          app = msal.ConfidentialClientApplication(
+              client_id,
+              authority=f"https://login.microsoftonline.com/{tenant_id}",
+              client_credential={"private_key": pem, "thumbprint": os.environ["AZURE_CERT_THUMBPRINT"]}
+          )
+
+          result = app.acquire_token_for_client(
+              scopes=["https://bcriholding.sharepoint.com/.default"]
+          )
+
+          if "access_token" in result:
+              token = result["access_token"]
+              print(f"Token acquired successfully (length: {len(token)})")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write(f"token={token}\n")
+          else:
+              print(f"Error: {result.get('error_description')}")
+              exit(1)
+          EOF
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CERT_BASE64: ${{ secrets.AZURE_CERT_BASE64 }}
+          AZURE_CERT_PASSWORD: ${{ secrets.AZURE_CERT_PASSWORD }}
+          AZURE_CERT_THUMBPRINT: ${{ secrets.AZURE_CERT_THUMBPRINT }}
 
       - name: Fetch KPIs from SharePoint
         id: fetch-kpis
