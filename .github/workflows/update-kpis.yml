@@ -91,7 +91,7 @@ jobs:
 
       - name: Update index.html with new KPIs
         run: |
-          python3 << 'EOF'
+          python3 << 'PYEOF'
           import json, os, re
 
           kpis_raw = os.environ.get("KPIS", "")
@@ -103,7 +103,6 @@ jobs:
               print(f"Found {len(items)} KPI items")
           except Exception as e:
               print(f"JSON parse error: {e}")
-              print("No KPI data found, keeping existing values")
               exit(0)
 
           if not items:
@@ -111,6 +110,8 @@ jobs:
               exit(0)
 
           colors = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
+          arrow_up = '\u25b2'
+          arrow_dn = '\u25bc'
 
           kpi_html = "\n    <!-- KPI-START -->\n"
           for i, item in enumerate(items):
@@ -120,13 +121,15 @@ jobs:
               tendance   = (item.get("Tendance") or "up").lower()
               color      = colors[i % len(colors)]
               css_class  = "up" if tendance == "up" else "dn"
-              arrow      = "▲" if tendance == "up" else "▼"
+              arrow      = arrow_up if tendance == "up" else arrow_dn
               print(f"KPI: {indicateur} | {valeur} | {delta} | {tendance}")
-              kpi_html += f"""    <div class="kpi" style="border-top: 2px solid {color}">
-                <div class="kpi-label">{indicateur}</div>
-                <div class="kpi-value">{valeur}</div>
-                <div class="kpi-delta {css_class}">{arrow} {delta}</div>
-              </div>\n"""
+              kpi_html += (
+                  f'    <div class="kpi" style="border-top: 2px solid {color}">\n'
+                  f'      <div class="kpi-label">{indicateur}</div>\n'
+                  f'      <div class="kpi-value">{valeur}</div>\n'
+                  f'      <div class="kpi-delta {css_class}">{arrow} {delta}</div>\n'
+                  f'    </div>\n'
+              )
           kpi_html += "    <!-- KPI-END -->"
 
           with open("index.html", "r", encoding="utf-8") as f:
@@ -142,9 +145,16 @@ jobs:
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(new_html)
 
-          print("index.html updated successfully ✅")
-          EOF
+          print("index.html updated successfully")
+          PYEOF
         env:
           KPIS: ${{ steps.fetch-kpis.outputs.kpis }}
 
-      - name: Commit an
+       name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
+          git add index.html
+          git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
+          git push
