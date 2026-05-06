@@ -23,19 +23,17 @@ jobs:
           python3 << 'EOF'
           import msal, os, base64, tempfile, subprocess
 
-          tenant_id = os.environ["AZURE_TENANT_ID"]
-          client_id = os.environ["AZURE_CLIENT_ID"]
-          cert_b64  = os.environ["AZURE_CERT_BASE64"]
-          cert_pwd  = os.environ["AZURE_CERT_PASSWORD"]
+          tenant_id  = os.environ["AZURE_TENANT_ID"]
+          client_id  = os.environ["AZURE_CLIENT_ID"]
+          cert_b64   = os.environ["AZURE_CERT_BASE64"]
+          cert_pwd   = os.environ["AZURE_CERT_PASSWORD"]
           thumbprint = os.environ["AZURE_CERT_THUMBPRINT"]
 
-          # Décoder le PFX
           pfx_data = base64.b64decode(cert_b64)
           with tempfile.NamedTemporaryFile(suffix=".pfx", delete=False) as f:
               f.write(pfx_data)
               pfx_path = f.name
 
-          # Convertir PFX en PEM
           pem_path = pfx_path.replace(".pfx", ".pem")
           subprocess.run([
               "openssl", "pkcs12", "-in", pfx_path,
@@ -46,7 +44,6 @@ jobs:
           with open(pem_path) as f:
               pem = f.read()
 
-          # Acquérir le token
           app = msal.ConfidentialClientApplication(
               client_id,
               authority=f"https://login.microsoftonline.com/{tenant_id}",
@@ -125,6 +122,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
           git add index.html
           git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
           git push
