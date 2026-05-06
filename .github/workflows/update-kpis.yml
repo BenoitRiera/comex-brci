@@ -150,11 +150,13 @@ jobs:
         env:
           KPIS: ${{ steps.fetch-kpis.outputs.kpis }}
 
-      - name: Commit and push changes
+      -  name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase
           git add index.html
+          git stash
+          git pull --rebase
+          git stash pop
           git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
           git push
