@@ -15,28 +15,27 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y openssl
-          pip install msal requests
+          pip install msal requests --quiet
 
-      - name: Get Azure token with certificate
+      - name: Get Azure token
         id: get-token
         run: |
           python3 << 'EOF'
-          import msal, os
+          import msal, os, base64, tempfile, subprocess
 
           tenant_id = os.environ["AZURE_TENANT_ID"]
           client_id = os.environ["AZURE_CLIENT_ID"]
           cert_b64  = os.environ["AZURE_CERT_BASE64"]
           cert_pwd  = os.environ["AZURE_CERT_PASSWORD"]
+          thumbprint = os.environ["AZURE_CERT_THUMBPRINT"]
 
-          import base64, tempfile
+          # Décoder le PFX
           pfx_data = base64.b64decode(cert_b64)
           with tempfile.NamedTemporaryFile(suffix=".pfx", delete=False) as f:
               f.write(pfx_data)
               pfx_path = f.name
 
           # Convertir PFX en PEM
-          import subprocess
           pem_path = pfx_path.replace(".pfx", ".pem")
           subprocess.run([
               "openssl", "pkcs12", "-in", pfx_path,
@@ -47,10 +46,11 @@ jobs:
           with open(pem_path) as f:
               pem = f.read()
 
+          # Acquérir le token
           app = msal.ConfidentialClientApplication(
               client_id,
               authority=f"https://login.microsoftonline.com/{tenant_id}",
-              client_credential={"private_key": pem, "thumbprint": os.environ["AZURE_CERT_THUMBPRINT"]}
+              client_credential={"private_key": pem, "thumbprint": thumbprint}
           )
 
           result = app.acquire_token_for_client(
@@ -95,7 +95,7 @@ jobs:
       - name: Update index.html with new KPIs
         run: |
           python3 << 'EOF'
-          import json, os, re
+          import json, os
 
           kpis_raw = os.environ.get("KPIS", "")
           print(f"Raw KPIs received: {kpis_raw[:200]}")
@@ -113,19 +113,8 @@ jobs:
               print("No KPI data found, keeping existing values")
               exit(0)
 
-          kpi_map = {item["Indicateur"]: item for item in items}
-
-          with open("index.html", "r", encoding="utf-8") as f:
-              html = f.read()
-
-          for indicateur, item in kpi_map.items():
-              valeur = item.get("Valeur", "")
-              delta = item.get("Delta", "")
-              tendance = item.get("Tendance", "up").lower()
-              print(f"Updating {indicateur}: {valeur} / {delta} / {tendance}")
-
-          with open("index.html", "w", encoding="utf-8") as f:
-              f.write(html)
+          for item in items:
+              print(f"KPI: {item.get('Indicateur')} | {item.get('Valeur')} | {item.get('Delta')} | {item.get('Tendance')}")
 
           print("index.html updated successfully")
           EOF
