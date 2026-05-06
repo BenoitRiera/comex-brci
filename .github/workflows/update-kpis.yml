@@ -92,7 +92,7 @@ jobs:
       - name: Update index.html with new KPIs
         run: |
           python3 << 'EOF'
-          import json, os
+          import json, os, re
 
           kpis_raw = os.environ.get("KPIS", "")
           print(f"Raw KPIs received: {kpis_raw[:200]}")
@@ -110,19 +110,41 @@ jobs:
               print("No KPI data found, keeping existing values")
               exit(0)
 
-          for item in items:
-              print(f"KPI: {item.get('Indicateur')} | {item.get('Valeur')} | {item.get('Delta')} | {item.get('Tendance')}")
+          colors = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
 
-          print("index.html updated successfully")
+          kpi_html = "\n    <!-- KPI-START -->\n"
+          for i, item in enumerate(items):
+              indicateur = item.get("Indicateur", "")
+              valeur     = item.get("Valeur", "")
+              delta      = item.get("Delta", "")
+              tendance   = (item.get("Tendance") or "up").lower()
+              color      = colors[i % len(colors)]
+              css_class  = "up" if tendance == "up" else "dn"
+              arrow      = "▲" if tendance == "up" else "▼"
+              print(f"KPI: {indicateur} | {valeur} | {delta} | {tendance}")
+              kpi_html += f"""    <div class="kpi" style="border-top: 2px solid {color}">
+                <div class="kpi-label">{indicateur}</div>
+                <div class="kpi-value">{valeur}</div>
+                <div class="kpi-delta {css_class}">{arrow} {delta}</div>
+              </div>\n"""
+          kpi_html += "    <!-- KPI-END -->"
+
+          with open("index.html", "r", encoding="utf-8") as f:
+              html = f.read()
+
+          new_html = re.sub(
+              r'<!-- KPI-START -->.*?<!-- KPI-END -->',
+              kpi_html,
+              html,
+              flags=re.DOTALL
+          )
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(new_html)
+
+          print("index.html updated successfully ✅")
           EOF
         env:
           KPIS: ${{ steps.fetch-kpis.outputs.kpis }}
 
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase
-          git add index.html
-          git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
-          git push
+      - name: Commit an
