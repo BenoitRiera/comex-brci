@@ -78,7 +78,7 @@ jobs:
 
           RESPONSE=$(curl -s \
             --write-out "\nHTTP_STATUS:%{http_code}" \
-            "https://bcriholding.sharepoint.com/sites/cockpitdirection/_api/web/lists/getbytitle('KPIs')/items?\$select=Titre,Indicateur,Valeur,Delta,Tendance&\$orderby=Titre%20asc" \
+            "https://bcriholding.sharepoint.com/sites/cockpitdirection/_api/web/lists/getbytitle('KPIs')/items?\$select=Title,Indicateur,Valeur,Delta,Tendance&\$orderby=Title%20asc" \
             -H "Accept: application/json;odata=nometadata" \
             -H "Authorization: Bearer $TOKEN")
 
