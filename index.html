@@ -301,6 +301,37 @@
     .main { padding: 14px 16px; }
     .login-box { margin: 20px; }
   }
+  .user-info { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-email { font-size: 10px; color: var(--text-muted); }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+  .ms-login-btn {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    color: #333;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .ms-login-btn:hover { opacity: .9; }
+  .ms-login-btn:disabled { opacity: .6; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -313,12 +344,16 @@
       <h1>BRCI Holding</h1>
       <p>Cockpit direction — COMEX</p>
     </div>
-    <div class="login-field">
-      <label>Mot de passe</label>
-      <input type="password" id="pwd-input" placeholder="••••••••" onkeydown="if(event.key==='Enter') checkPassword()">
-    </div>
+    <button class="ms-login-btn" id="ms-login-btn" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none">
+        <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+        <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+      </svg>
+      Se connecter avec Microsoft
+    </button>
     <div class="login-error" id="login-error"></div>
-    <button class="login-btn" onclick="checkPassword()">Accéder au cockpit</button>
   </div>
 </div>
 
@@ -335,7 +370,12 @@
     </div>
     <div class="topbar-right">
       <div class="update-time" id="update-time"></div>
-      <div class="avatar">BR</div>
+      <div class="user-info" id="user-info" style="display:none">
+        <span class="user-name" id="user-name"></span>
+        <span class="user-email" id="user-email"></span>
+      </div>
+      <div class="avatar" id="avatar">BR</div>
+      <button class="logout-btn" id="logout-btn" onclick="signOut()" style="display:none">Déconnexion</button>
     </div>
   </div>
 
@@ -513,44 +553,69 @@
   </div>
 </div><!-- end dashboard -->
 
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <script>
-  const PASS = '2026BCRi!';
-  const SESSION_KEY = 'brci_auth';
+  const msalConfig = {
+    auth: {
+      clientId: "f88591b6-0e15-4520-b1b0-2fc35c5949ed",
+      authority: "https://login.microsoftonline.com/96a6208f-9e8e-408b-b744-2fdd5022195a",
+      redirectUri: "https://benoitriera.github.io/comex-brci/"
+    },
+    cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
+  };
+  const loginRequest = { scopes: ["User.Read"] };
+  let msalInstance;
 
-  function checkPassword() {
-    const input = document.getElementById('pwd-input').value;
-    if (input === PASS) {
-      sessionStorage.setItem(SESSION_KEY, '1');
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('dashboard').style.display = 'block';
-      initDashboard();
-    } else {
-      document.getElementById('login-error').textContent = 'Mot de passe incorrect.';
-      document.getElementById('pwd-input').value = '';
-      document.getElementById('pwd-input').focus();
+  async function initAuth() {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    const response = await msalInstance.handleRedirectPromise();
+    const account = response?.account || msalInstance.getAllAccounts()[0];
+    if (account) onAuthenticated(account);
+  }
+
+  async function signIn() {
+    document.getElementById('login-error').textContent = '';
+    const btn = document.getElementById('ms-login-btn');
+    btn.disabled = true;
+    try {
+      const response = await msalInstance.loginPopup(loginRequest);
+      onAuthenticated(response.account);
+    } catch (err) {
+      btn.disabled = false;
+      if (err.errorCode !== 'user_cancelled') {
+        document.getElementById('login-error').textContent = 'Erreur de connexion. Veuillez réessayer.';
+      }
     }
   }
 
-  // Auto-login si déjà authentifié dans la session
-  if (sessionStorage.getItem(SESSION_KEY) === '1') {
+  function signOut() {
+    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-brci/" });
+  }
+
+  function onAuthenticated(account) {
+    const name = account.name || account.username.split('@')[0];
+    const email = account.username;
+    const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0, 2).toUpperCase();
+    document.getElementById('user-name').textContent = name;
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('avatar').textContent = initials;
+    document.getElementById('logout-btn').style.display = 'block';
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     initDashboard();
   }
 
   function initDashboard() {
-    // Update time
     const now = new Date();
     document.getElementById('update-time').textContent =
       'Mis à jour le ' + now.toLocaleDateString('fr-FR') + ' à ' +
       now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-
-    // Carousel
     const VISIBLE = 4;
     const total = 8;
     const pages = Math.ceil(total / VISIBLE);
     let current = 0;
-
     const dotsEl = document.getElementById('dots');
     dotsEl.innerHTML = '';
     for (let i = 0; i < pages; i++) {
@@ -559,7 +624,6 @@
       d.onclick = () => goTo(i);
       dotsEl.appendChild(d);
     }
-
     function goTo(page) {
       current = Math.max(0, Math.min(page, pages - 1));
       const cards = document.querySelectorAll('.process-card');
@@ -567,9 +631,10 @@
       document.getElementById('track').style.transform = `translateX(-${current * VISIBLE * cardW}px)`;
       document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current));
     }
-
     window.slide = function(dir) { goTo(current + dir); }
   }
+
+  initAuth();
 </script>
 
 </body>

@@ -66,6 +66,11 @@
   .chart-msg { font-size: 12px; color: var(--text-dim); }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .main { padding: 14px 16px; } }
+  .user-info { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-email { font-size: 10px; color: var(--text-muted); }
+  .logout-btn { background: transparent; border: 1px solid var(--card-border); border-radius: 6px; padding: 4px 10px; color: var(--text-muted); font-family: 'DM Sans', sans-serif; font-size: 11px; cursor: pointer; transition: all .2s; }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -81,7 +86,12 @@
   </div>
   <div class="topbar-right">
     <div class="update-time" id="update-time"></div>
-    <div class="avatar">BR</div>
+    <div class="user-info" id="user-info" style="display:none">
+      <span class="user-name" id="user-name"></span>
+      <span class="user-email" id="user-email"></span>
+    </div>
+    <div class="avatar" id="avatar">BR</div>
+    <button class="logout-btn" id="logout-btn" onclick="signOut()" style="display:none">Déconnexion</button>
   </div>
 </div>
 
@@ -138,18 +148,56 @@
 
 </div>
 
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <script>
-  if (!sessionStorage.getItem('brci_auth')) window.location.href = 'index.html';
-  const now = new Date();
-  document.getElementById('update-time').textContent =
-    'Mis à jour le ' + now.toLocaleDateString('fr-FR') + ' à ' +
-    now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-  document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+  const msalConfig = {
+    auth: {
+      clientId: "f88591b6-0e15-4520-b1b0-2fc35c5949ed",
+      authority: "https://login.microsoftonline.com/96a6208f-9e8e-408b-b744-2fdd5022195a",
+      redirectUri: "https://benoitriera.github.io/comex-brci/"
+    },
+    cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
+  };
+  let msalInstance;
+
+  async function initAuth() {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    const response = await msalInstance.handleRedirectPromise();
+    const account = response?.account || msalInstance.getAllAccounts()[0];
+    if (account) {
+      onAuthenticated(account);
+    } else {
+      window.location.href = 'index.html';
+    }
+  }
+
+  function signOut() {
+    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-brci/" });
+  }
+
+  function onAuthenticated(account) {
+    const name = account.name || account.username.split('@')[0];
+    const email = account.username;
+    const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0, 2).toUpperCase();
+    document.getElementById('user-name').textContent = name;
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('avatar').textContent = initials;
+    document.getElementById('logout-btn').style.display = 'block';
+    const now = new Date();
+    document.getElementById('update-time').textContent =
+      'Mis à jour le ' + now.toLocaleDateString('fr-FR') + ' à ' +
+      now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
     });
-  });
+  }
+
+  initAuth();
 </script>
 
 </body>
