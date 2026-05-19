@@ -107,119 +107,113 @@ jobs:
       - name: Update detail pages from Excel
         run: |
           python3 << 'PYEOF'
-          import openpyxl, re
+          import openpyxl, re, json
 
-          SHEET_TO_FILE = {
-              'Finance':              'finance.html',
-              'Commerce':             'commerce.html',
-              'Operations':           'operations.html',
-              'Opérations':           'operations.html',
-              'RH':                   'rh.html',
-              'Ressources humaines':  'rh.html',
-              'Management':           'management.html',
-              'Informatique':         'informatique.html',
-              'IT':                   'informatique.html',
-              'Implémentation':       'implementation.html',
-              'Implementation':       'implementation.html',
-              'Achats':               'achats.html',
+          # Direct cell-reference mapping (same structure on every sheet)
+          # Each entity: (val_col, val_start_row, ecart_col, ecart_start_row)
+          ENTITIES = [
+              ('Global',             'I', 48, 'M', 48),
+              ('ESEIS',              'C',  6, 'G',  6),
+              ('ESEIS Cleaning',     'C', 13, 'G', 13),
+              ('ESEIS Pest Control', 'C', 20, 'G', 20),
+              ('ALS',                'C', 27, 'G', 27),
+              ('Café Coton',         'C', 34, 'G', 34),
+              ('ESEIS Travaux',      'C', 41, 'G', 41),
+          ]
+          LABEL_COL   = 'A'
+          LABEL_START = 6
+          N_KPIS      = 4
+          COLORS      = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
+
+          PAGE_TO_SHEET = {
+              'finance.html':        'Finance',
+              'commerce.html':       'Commerce',
+              'operations.html':     'Opérations',
+              'rh.html':             'RH',
+              'management.html':     'Management',
+              'informatique.html':   'Informatique',
+              'implementation.html': 'Implémentation',
+              'achats.html':         'Achats',
           }
 
-          COLORS = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
-          ARROW_UP = '▲'
-          ARROW_DN = '▼'
+          def cval(ws, col, row):
+              v = ws[f"{col}{row}"].value
+              if v is None: return '--'
+              if isinstance(v, float):
+                  return str(int(v)) if v == int(v) else str(round(v, 4))
+              return str(v).strip()
 
-          def find_col(headers, keywords):
-              for kw in keywords:
-                  for i, h in enumerate(headers):
-                      if h and kw in h.lower():
-                          return i
-              return None
-
-          def find_header_row(ws):
-              """Scan rows 1-15 to find the one containing KPI/Indicateur/Valeur keywords."""
-              keywords = ['kpi', 'indicateur', 'libellé', 'libelle', 'valeur', 'value']
-              for row_idx in range(1, 16):
-                  row_vals = [str(ws.cell(row=row_idx, column=c).value or '').strip()
-                              for c in range(1, ws.max_column + 1)]
-                  row_str = ' '.join(v.lower() for v in row_vals)
-                  if any(kw in row_str for kw in keywords):
-                      print(f"  Header row found at row {row_idx}: {row_vals[:5]}")
-                      return row_idx, row_vals
-              print("  No header row found, defaulting to row 1")
-              return 1, [str(ws.cell(row=1, column=c).value or '').strip()
-                         for c in range(1, ws.max_column + 1)]
-
-          def infer_tendance(delta_str):
-              s = str(delta_str)
-              if '+' in s:
-                  return ARROW_UP, 'up'
-              if '-' in s or '−' in s:
-                  return ARROW_DN, 'dn'
+          def tendance(s):
+              if '+' in str(s): return '▲', 'up'
+              if '-' in str(s) or '−' in str(s): return '▼', 'dn'
               return '', ''
 
           wb = openpyxl.load_workbook('kpis_synthese.xlsx', data_only=True)
-          processed = set()
 
-          for sheet_name in wb.sheetnames:
-              html_file = SHEET_TO_FILE.get(sheet_name.strip())
-              if not html_file or html_file in processed:
+          for html_file, sheet_name in PAGE_TO_SHEET.items():
+              if sheet_name not in wb.sheetnames:
+                  print(f"Sheet '{sheet_name}' not found, skipping {html_file}")
                   continue
-              processed.add(html_file)
 
               ws = wb[sheet_name]
-              print(f"Sheet '{sheet_name}' → {html_file}")
-
-              header_row_idx, headers = find_header_row(ws)
-
-              col_ind = find_col(headers, ['indicateur', 'libellé', 'libelle', 'kpi', 'nom'])
-              col_val = find_col(headers, ['valeur', 'value'])
-              col_uni = find_col(headers, ['unité', 'unite', 'unit'])
-              col_del = find_col(headers, ['delta', 'variation', 'écart', 'ecart'])
-
-              if col_ind is None: col_ind = 0
-              if col_val is None: col_val = 1
-              if col_del is None: col_del = 2
-
-              print(f"  Columns → indicateur:{col_ind} valeur:{col_val} unité:{col_uni} delta:{col_del}")
-
-              items = []
-              for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
-                  if not row or col_ind >= len(row) or not row[col_ind]:
-                      continue
-                  indicateur = str(row[col_ind]).strip()
-                  # Skip rows that look like sub-headers or entity names
-                  if indicateur.upper() == indicateur and len(indicateur) < 30 and row[col_val] is None:
-                      continue
-                  val_raw  = row[col_val] if col_val < len(row) else None
-                  uni_raw  = row[col_uni] if col_uni is not None and col_uni < len(row) else None
-                  del_raw  = row[col_del] if col_del < len(row) else None
-                  # Format value: combine number + unit if available
-                  if val_raw is not None:
-                      val_str = str(val_raw)
-                      if uni_raw:
-                          val_str = f"{val_str} {uni_raw}"
-                  else:
-                      val_str = '--'
-                  delta = str(del_raw) if del_raw is not None else '—'
-                  items.append({'indicateur': indicateur, 'valeur': val_str, 'delta': delta})
-                  print(f"  Row: {indicateur} | {val_str} | {delta}")
-
-              if not items:
-                  print(f"No data in sheet '{sheet_name}', skipping {html_file}")
-                  continue
+              print(f"Sheet '{sheet_name}' -> {html_file}")
 
               kpi_html = "\n    <!-- KPI-START -->\n"
-              for i, item in enumerate(items[:4]):
-                  color = COLORS[i % len(COLORS)]
-                  arrow, css_class = infer_tendance(item['delta'])
-                  delta_display = f"{arrow} {item['delta']}" if arrow else item['delta']
+
+              for i in range(N_KPIS):
+                  label = cval(ws, LABEL_COL, LABEL_START + i)
+                  color = COLORS[i]
+
+                  # Collect all entity data
+                  ent_data = {}
+                  for ent_name, vc, vr, ec, er in ENTITIES:
+                      ent_data[ent_name] = {
+                          'val':   cval(ws, vc, vr + i),
+                          'ecart': cval(ws, ec, er + i),
+                      }
+
+                  # Default display = Global
+                  default_val   = ent_data['Global']['val']
+                  default_ecart = ent_data['Global']['ecart']
+                  arrow, css    = tendance(default_ecart)
+                  ecart_display = f"{arrow} {default_ecart}" if arrow else default_ecart
+
+                  data_attr = json.dumps(ent_data, ensure_ascii=False).replace("'", "&#39;")
+
+                  print(f"  KPI {i+1}: {label} | {default_val} | {default_ecart}")
                   kpi_html += (
-                      f'    <div class="kpi" style="border-top:2px solid {color}">\n'
-                      f'      <div class="kpi-label">{item["indicateur"]}</div>\n'
-                      f'      <div class="kpi-value">{item["valeur"]}</div>\n'
-                      f'      <div class="kpi-delta {css_class}">{delta_display}</div>\n'
-                      f'    </div>\n'
+                      f"    <div class=\"kpi\" style=\"border-top:2px solid {color}\""
+                      f" data-kpi='{data_attr}'>\n"
+                      f"      <div class=\"kpi-label\">{label}</div>\n"
+                      f"      <div class=\"kpi-value\">{default_val}</div>\n"
+                      f"      <div class=\"kpi-delta {css}\">{ecart_display}</div>\n"
+                      f"    </div>\n"
                   )
+
+              # Entity-switching script (activates filter buttons)
+              kpi_html += "    <script>\n"
+              kpi_html += "    (function(){\n"
+              kpi_html += "      function switchEntity(name){\n"
+              kpi_html += "        document.querySelectorAll('.kpi[data-kpi]').forEach(function(card){\n"
+              kpi_html += "          var d=JSON.parse(card.dataset.kpi);\n"
+              kpi_html += "          var e=d[name]||d['Global'];\n"
+              kpi_html += "          card.querySelector('.kpi-value').textContent=e.val;\n"
+              kpi_html += "          var el=card.querySelector('.kpi-delta');\n"
+              kpi_html += "          var s=e.ecart;\n"
+              kpi_html += "          var a=s.includes('+')?'▲':s.includes('-')?'▼':'';\n"
+              kpi_html += "          el.textContent=a?a+' '+s:s;\n"
+              kpi_html += "          el.className='kpi-delta '+(s.includes('+')?'up':s.includes('-')?'dn':'');\n"
+              kpi_html += "        });\n"
+              kpi_html += "      }\n"
+              kpi_html += "      document.querySelectorAll('.filter-btn').forEach(function(btn){\n"
+              kpi_html += "        btn.addEventListener('click',function(){\n"
+              kpi_html += "          document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});\n"
+              kpi_html += "          btn.classList.add('active');\n"
+              kpi_html += "          switchEntity(btn.textContent.trim());\n"
+              kpi_html += "        });\n"
+              kpi_html += "      });\n"
+              kpi_html += "    })();\n"
+              kpi_html += "    </script>\n"
               kpi_html += "    <!-- KPI-END -->"
 
               with open(html_file, 'r', encoding='utf-8') as f:
@@ -227,15 +221,13 @@ jobs:
 
               new_html = re.sub(
                   r'<!-- KPI-START -->.*?<!-- KPI-END -->',
-                  kpi_html,
-                  html,
-                  flags=re.DOTALL
+                  kpi_html, html, flags=re.DOTALL
               )
 
               with open(html_file, 'w', encoding='utf-8') as f:
                   f.write(new_html)
 
-              print(f"{html_file}: updated with {len(items[:4])} KPIs from sheet '{sheet_name}'")
+              print(f"  -> {html_file} updated OK")
 
           PYEOF
 
