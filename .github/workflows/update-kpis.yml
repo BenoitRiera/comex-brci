@@ -323,9 +323,18 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git stash
-          git pull --rebase origin main
-          git stash pop || true
-          git add index.html finance.html commerce.html operations.html rh.html management.html informatique.html implementation.html achats.html
+
+          # Save freshly generated files before syncing with remote
+          FILES="index.html finance.html commerce.html operations.html rh.html management.html informatique.html implementation.html achats.html"
+          for f in $FILES; do cp "$f" "/tmp/$f"; done
+
+          # Reset to latest remote state (avoids stash/merge conflicts)
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Restore generated files on top of latest remote
+          for f in $FILES; do cp "/tmp/$f" "$f"; done
+
+          git add $FILES
           git diff --staged --quiet || git commit -m "Update KPIs from SharePoint [$(date +'%Y-%m-%d %H:%M')]"
           git push
