@@ -593,9 +593,17 @@
     msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-brci/" });
   }
 
+  const ALLOWED_EMAILS = ['benoit.riera@bcr-i.com', 'nicolas.thomas@bcr-i.com'];
+
   function onAuthenticated(account) {
+    const email = account.username.toLowerCase();
+    if (!ALLOWED_EMAILS.includes(email)) {
+      document.getElementById('login-error').textContent = 'Accès refusé. Ce compte n\'est pas autorisé à accéder à cette application.';
+      document.getElementById('ms-login-btn').disabled = false;
+      msalInstance.clearCache();
+      return;
+    }
     const name = account.name || account.username.split('@')[0];
-    const email = account.username;
     const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0, 2).toUpperCase();
     document.getElementById('user-name').textContent = name;
     document.getElementById('user-email').textContent = email;

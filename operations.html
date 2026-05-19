@@ -161,12 +161,14 @@
   };
   let msalInstance;
 
+  const ALLOWED_EMAILS = ['benoit.riera@bcr-i.com', 'nicolas.thomas@bcr-i.com'];
+
   async function initAuth() {
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
     const response = await msalInstance.handleRedirectPromise();
     const account = response?.account || msalInstance.getAllAccounts()[0];
-    if (account) {
+    if (account && ALLOWED_EMAILS.includes(account.username.toLowerCase())) {
       onAuthenticated(account);
     } else {
       window.location.href = 'index.html';
