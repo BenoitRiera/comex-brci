@@ -121,27 +121,51 @@
     
 =======
 >>>>>>> Stashed changes
+    
     <!-- KPI-START -->
-    <div class="kpi" style="border-top:2px solid var(--teal)">
-      <div class="kpi-label">Période : Mois en cours  |  Saisie manuelle</div>
-      <div class="kpi-value">--</div>
-      <div class="kpi-delta ">—</div>
-    </div>
-    <div class="kpi" style="border-top:2px solid var(--blue)">
-      <div class="kpi-label">KPI</div>
-      <div class="kpi-value">Unité</div>
-      <div class="kpi-delta ">Valeur</div>
-    </div>
-    <div class="kpi" style="border-top:2px solid var(--amber)">
+    <div class="kpi" style="border-top:2px solid var(--teal)" data-kpi='{"Global": {"val": "6.1667", "ecart": "1.0556"}, "ESEIS": {"val": "7", "ecart": "0.1667"}, "ESEIS Cleaning": {"val": "7", "ecart": "0.1667"}, "ESEIS Pest Control": {"val": "7", "ecart": "0.1667"}, "ALS": {"val": "3", "ecart": "0"}, "Café Coton": {"val": "2", "ecart": "0"}, "ESEIS Travaux": {"val": "7", "ecart": "0.1667"}}'>
       <div class="kpi-label">Projets livrés</div>
-      <div class="kpi-value">nb</div>
-      <div class="kpi-delta ">7</div>
+      <div class="kpi-value">6.1667</div>
+      <div class="kpi-delta ">1.0556</div>
     </div>
-    <div class="kpi" style="border-top:2px solid var(--purple)">
+    <div class="kpi" style="border-top:2px solid var(--blue)" data-kpi='{"Global": {"val": "0.8433", "ecart": "0.1104"}, "ESEIS": {"val": "0.86", "ecart": "0.0753"}, "ESEIS Cleaning": {"val": "0.86", "ecart": "0.0753"}, "ESEIS Pest Control": {"val": "0.86", "ecart": "0.0753"}, "ALS": {"val": "0.74", "ecart": "0.0753"}, "Café Coton": {"val": "0.88", "ecart": "0.0753"}, "ESEIS Travaux": {"val": "0.86", "ecart": "0.0753"}}'>
       <div class="kpi-label">Respect délais</div>
-      <div class="kpi-value">%</div>
-      <div class="kpi-delta ">0.86</div>
+      <div class="kpi-value">0.8433</div>
+      <div class="kpi-delta ">0.1104</div>
     </div>
+    <div class="kpi" style="border-top:2px solid var(--amber)" data-kpi='{"Global": {"val": "0.8967", "ecart": "0.1146"}, "ESEIS": {"val": "0.92", "ecart": "0.0753"}, "ESEIS Cleaning": {"val": "0.92", "ecart": "0.0753"}, "ESEIS Pest Control": {"val": "0.92", "ecart": "0.0753"}, "ALS": {"val": "0.81", "ecart": "0.0753"}, "Café Coton": {"val": "0.89", "ecart": "0.0753"}, "ESEIS Travaux": {"val": "0.92", "ecart": "0.0753"}}'>
+      <div class="kpi-label">Respect budget</div>
+      <div class="kpi-value">0.8967</div>
+      <div class="kpi-delta ">0.1146</div>
+    </div>
+    <div class="kpi" style="border-top:2px solid var(--purple)" data-kpi='{"Global": {"val": "7.9333", "ecart": "0.1333"}, "ESEIS": {"val": "8.1", "ecart": "0.1571"}, "ESEIS Cleaning": {"val": "8.1", "ecart": "0.1571"}, "ESEIS Pest Control": {"val": "8.1", "ecart": "0.1571"}, "ALS": {"val": "7.2", "ecart": "0.0286"}, "Café Coton": {"val": "8", "ecart": "0.1429"}, "ESEIS Travaux": {"val": "8.1", "ecart": "0.1571"}}'>
+      <div class="kpi-label">Satisfaction client</div>
+      <div class="kpi-value">7.9333</div>
+      <div class="kpi-delta ">0.1333</div>
+    </div>
+    <script>
+    (function(){
+      function switchEntity(name){
+        document.querySelectorAll('.kpi[data-kpi]').forEach(function(card){
+          var d=JSON.parse(card.dataset.kpi);
+          var e=d[name]||d['Global'];
+          card.querySelector('.kpi-value').textContent=e.val;
+          var el=card.querySelector('.kpi-delta');
+          var s=e.ecart;
+          var a=s.includes('+')?'▲':s.includes('-')?'▼':'';
+          el.textContent=a?a+' '+s:s;
+          el.className='kpi-delta '+(s.includes('+')?'up':s.includes('-')?'dn':'');
+        });
+      }
+      document.querySelectorAll('.filter-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+          btn.classList.add('active');
+          switchEntity(btn.textContent.trim());
+        });
+      });
+    })();
+    </script>
     <!-- KPI-END -->
   </div>
 

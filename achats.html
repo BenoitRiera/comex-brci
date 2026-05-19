@@ -121,27 +121,51 @@
     
 =======
 >>>>>>> Stashed changes
+    
     <!-- KPI-START -->
-    <div class="kpi" style="border-top:2px solid var(--teal)">
-      <div class="kpi-label">Période : Mois en cours  |  Saisie manuelle</div>
-      <div class="kpi-value">--</div>
-      <div class="kpi-delta ">—</div>
-    </div>
-    <div class="kpi" style="border-top:2px solid var(--blue)">
-      <div class="kpi-label">KPI</div>
-      <div class="kpi-value">Unité</div>
-      <div class="kpi-delta ">Valeur</div>
-    </div>
-    <div class="kpi" style="border-top:2px solid var(--amber)">
+    <div class="kpi" style="border-top:2px solid var(--teal)" data-kpi='{"Global": {"val": "415533.3333", "ecart": "1.0756"}, "ESEIS": {"val": "480000", "ecart": "0.0989"}, "ESEIS Cleaning": {"val": "480000", "ecart": "0.0989"}, "ESEIS Pest Control": {"val": "480000", "ecart": "0.0989"}, "ALS": {"val": "145000", "ecart": "0.0989"}, "Café Coton": {"val": "98000", "ecart": "0.0989"}, "ESEIS Travaux": {"val": "480000", "ecart": "0.0989"}}'>
       <div class="kpi-label">Volume achats</div>
-      <div class="kpi-value">€</div>
-      <div class="kpi-delta ">480000</div>
+      <div class="kpi-value">415533.3333</div>
+      <div class="kpi-delta ">1.0756</div>
     </div>
-    <div class="kpi" style="border-top:2px solid var(--purple)">
+    <div class="kpi" style="border-top:2px solid var(--blue)" data-kpi='{"Global": {"val": "26.5", "ecart": "0.6562"}, "ESEIS": {"val": "34", "ecart": "0.0968"}, "ESEIS Cleaning": {"val": "34", "ecart": "0.0968"}, "ESEIS Pest Control": {"val": "34", "ecart": "0.0968"}, "ALS": {"val": "14", "ecart": "0.0769"}, "Café Coton": {"val": "9", "ecart": "0.125"}, "ESEIS Travaux": {"val": "34", "ecart": "0.0968"}}'>
       <div class="kpi-label">Nb fournisseurs actifs</div>
-      <div class="kpi-value">nb</div>
-      <div class="kpi-delta ">34</div>
+      <div class="kpi-value">26.5</div>
+      <div class="kpi-delta ">0.6562</div>
     </div>
+    <div class="kpi" style="border-top:2px solid var(--amber)" data-kpi='{"Global": {"val": "0.9483", "ecart": "0.0925"}, "ESEIS": {"val": "0.96", "ecart": "0.0753"}, "ESEIS Cleaning": {"val": "0.96", "ecart": "0.0753"}, "ESEIS Pest Control": {"val": "0.96", "ecart": "0.0753"}, "ALS": {"val": "0.91", "ecart": "0.0753"}, "Café Coton": {"val": "0.94", "ecart": "0.0753"}, "ESEIS Travaux": {"val": "0.96", "ecart": "0.0753"}}'>
+      <div class="kpi-label">Taux conformité</div>
+      <div class="kpi-value">0.9483</div>
+      <div class="kpi-delta ">0.0925</div>
+    </div>
+    <div class="kpi" style="border-top:2px solid var(--purple)" data-kpi='{"Global": {"val": "28840", "ecart": "0.8197"}, "ESEIS": {"val": "38400", "ecart": "0.0989"}, "ESEIS Cleaning": {"val": "38400", "ecart": "0.0989"}, "ESEIS Pest Control": {"val": "38400", "ecart": "0.0989"}, "ALS": {"val": "11600", "ecart": "0.0989"}, "Café Coton": {"val": "7840", "ecart": "0.099"}, "ESEIS Travaux": {"val": "38400", "ecart": "0.0989"}}'>
+      <div class="kpi-label">Économies réalisées</div>
+      <div class="kpi-value">28840</div>
+      <div class="kpi-delta ">0.8197</div>
+    </div>
+    <script>
+    (function(){
+      function switchEntity(name){
+        document.querySelectorAll('.kpi[data-kpi]').forEach(function(card){
+          var d=JSON.parse(card.dataset.kpi);
+          var e=d[name]||d['Global'];
+          card.querySelector('.kpi-value').textContent=e.val;
+          var el=card.querySelector('.kpi-delta');
+          var s=e.ecart;
+          var a=s.includes('+')?'▲':s.includes('-')?'▼':'';
+          el.textContent=a?a+' '+s:s;
+          el.className='kpi-delta '+(s.includes('+')?'up':s.includes('-')?'dn':'');
+        });
+      }
+      document.querySelectorAll('.filter-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+          btn.classList.add('active');
+          switchEntity(btn.textContent.trim());
+        });
+      });
+    })();
+    </script>
     <!-- KPI-END -->
   </div>
 
