@@ -121,6 +121,7 @@ jobs:
               ('ESEIS Travaux',      'C', 41, 'G', 41),
           ]
           LABEL_COL   = 'A'
+          FORMAT_COL  = 'B'
           LABEL_START = 6
           N_KPIS      = 4
           COLORS      = ['var(--teal)', 'var(--blue)', 'var(--amber)', 'var(--purple)']
@@ -129,23 +130,49 @@ jobs:
               'finance.html':        'Finance',
               'commerce.html':       'Commerce',
               'operations.html':     'Opérations',
-              'rh.html':             'RH',
+              'rh.html':             'Ressources Humaines',
               'management.html':     'Management',
               'informatique.html':   'Informatique',
               'implementation.html': 'Implémentation',
               'achats.html':         'Achats',
           }
 
-          def cval(ws, col, row):
-              v = ws[f"{col}{row}"].value
-              if v is None: return '--'
-              if isinstance(v, float):
-                  return str(int(v)) if v == int(v) else str(round(v, 4))
-              return str(v).strip()
+          def raw(ws, col, row):
+              return ws[f"{col}{row}"].value
 
-          def tendance(s):
-              if '+' in str(s): return '▲', 'up'
-              if '-' in str(s) or '−' in str(s): return '▼', 'dn'
+          def fmt_val(v, unit):
+              """Format a numeric value according to its unit."""
+              if v is None: return '--'
+              unit = (unit or '').strip()
+              try:
+                  n = float(v)
+              except (ValueError, TypeError):
+                  return str(v).strip()
+              if unit == '%':
+                  return f"{n*100:,.2f} %".replace(',', ' ').replace('.', ',')
+              if unit == '€':
+                  return f"{n:,.0f} €".replace(',', ' ')
+              if unit:
+                  # generic unit: round intelligently then append
+                  formatted = f"{n:,.2f}".replace(',', ' ').replace('.', ',').rstrip('0').rstrip(',')
+                  return f"{formatted} {unit}"
+              # No unit: display integer if whole, else 2 decimals
+              if n == int(n): return f"{int(n):,}".replace(',', ' ')
+              return f"{n:,.2f}".replace(',', ' ').replace('.', ',')
+
+          def fmt_ecart(v):
+              """Format an écart vs N-1 (stored as decimal ratio, e.g. 0.084 = +8,4%)."""
+              if v is None: return '—'
+              try:
+                  n = float(v)
+              except (ValueError, TypeError):
+                  return str(v).strip()
+              sign = '+' if n >= 0 else ''
+              return f"{sign}{n*100:,.1f} %".replace(',', ' ').replace('.', ',')
+
+          def tendance(ecart_str):
+              if '+' in str(ecart_str): return '▲', 'up'
+              if ecart_str.startswith('-'): return '▼', 'dn'
               return '', ''
 
           wb = openpyxl.load_workbook('kpis_synthese.xlsx', data_only=True)
@@ -161,15 +188,19 @@ jobs:
               kpi_html = "\n    <!-- KPI-START -->\n"
 
               for i in range(N_KPIS):
-                  label = cval(ws, LABEL_COL, LABEL_START + i)
+                  label = str(raw(ws, LABEL_COL,  LABEL_START + i) or '').strip()
+                  unit  = str(raw(ws, FORMAT_COL, LABEL_START + i) or '').strip()
                   color = COLORS[i]
 
-                  # Collect all entity data
+                  # Collect all entity data with formatting applied
                   ent_data = {}
                   for ent_name, vc, vr, ec, er in ENTITIES:
+                      val_raw   = raw(ws, vc, vr + i)
+                      ecart_raw = raw(ws, ec, er + i)
+                      ecart_str = fmt_ecart(ecart_raw)
                       ent_data[ent_name] = {
-                          'val':   cval(ws, vc, vr + i),
-                          'ecart': cval(ws, ec, er + i),
+                          'val':   fmt_val(val_raw, unit),
+                          'ecart': ecart_str,
                       }
 
                   # Default display = Global
@@ -180,7 +211,7 @@ jobs:
 
                   data_attr = json.dumps(ent_data, ensure_ascii=False).replace("'", "&#39;")
 
-                  print(f"  KPI {i+1}: {label} | {default_val} | {default_ecart}")
+                  print(f"  KPI {i+1}: [{unit}] {label} | {default_val} | {default_ecart}")
                   kpi_html += (
                       f"    <div class=\"kpi\" style=\"border-top:2px solid {color}\""
                       f" data-kpi='{data_attr}'>\n"
