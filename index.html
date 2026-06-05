@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cockpit COMEX — BRCI Holding</title>
+<title>Cockpit COMEX — BCRI Holding</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -349,7 +349,7 @@
   <div class="login-box">
     <div class="login-logo">BR</div>
     <div class="login-title">
-      <h1>BRCI Holding</h1>
+      <h1>BCRI Holding</h1>
       <p>Cockpit direction — COMEX</p>
     </div>
     <button class="ms-login-btn" id="ms-login-btn" onclick="signIn()">
@@ -372,7 +372,7 @@
     <div class="topbar-left">
       <div class="logo">BR</div>
       <div>
-        <div class="app-name">BRCI Holding</div>
+        <div class="app-name">BCRI Holding</div>
         <div class="app-sub">Cockpit direction — COMEX</div>
       </div>
     </div>
@@ -619,7 +619,7 @@
     auth: {
       clientId: "f88591b6-0e15-4520-b1b0-2fc35c5949ed",
       authority: "https://login.microsoftonline.com/96a6208f-9e8e-408b-b744-2fdd5022195a",
-      redirectUri: "https://benoitriera.github.io/comex-brci/"
+      redirectUri: "https://benoitriera.github.io/comex-bcri/"
     },
     cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
   };
@@ -650,7 +650,7 @@
   }
 
   function signOut() {
-    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-brci/" });
+    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-bcri/" });
   }
 
   const ALLOWED_EMAILS = ['benoit.riera@bcr-i.com', 'nicolas.thomas@bcr-i.com'];

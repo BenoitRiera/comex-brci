@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Achats — BRCI Holding</title>
+<title>Achats — BCRI Holding</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -81,7 +81,7 @@
     <div class="logo">BR</div>
     <div>
       <div class="app-name">Achats</div>
-      <div class="app-sub">BRCI Holding — Cockpit direction</div>
+      <div class="app-sub">BCRI Holding — Cockpit direction</div>
     </div>
   </div>
   <div class="topbar-right">
@@ -199,7 +199,7 @@
     auth: {
       clientId: "f88591b6-0e15-4520-b1b0-2fc35c5949ed",
       authority: "https://login.microsoftonline.com/96a6208f-9e8e-408b-b744-2fdd5022195a",
-      redirectUri: "https://benoitriera.github.io/comex-brci/"
+      redirectUri: "https://benoitriera.github.io/comex-bcri/"
     },
     cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
   };
@@ -220,7 +220,7 @@
   }
 
   function signOut() {
-    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-brci/" });
+    msalInstance.logoutRedirect({ postLogoutRedirectUri: "https://benoitriera.github.io/comex-bcri/" });
   }
 
   function onAuthenticated(account) {
